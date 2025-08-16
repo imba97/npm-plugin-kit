@@ -1,0 +1,126 @@
+import { exec } from 'node:child_process'
+import { promisify } from 'node:util'
+import { ensureDir, pathExists, readJSON } from 'fs-extra'
+import { join } from 'pathe'
+
+const execAsync = promisify(exec)
+
+interface NpmManagerOptions {
+  registry?: string
+  npmPath?: string
+}
+
+export class NpmManager {
+  private readonly registry: string
+  private readonly npmCommand: string
+
+  constructor(
+    private pluginDir: string,
+    options: NpmManagerOptions = {}
+  ) {
+    this.registry = options.registry || 'https://registry.npmjs.org'
+    this.npmCommand = options.npmPath || 'npm'
+  }
+
+  private async executeNpmCommand(command: string): Promise<{ stdout: string, stderr: string }> {
+    const fullCommand = `${this.npmCommand} ${command}`
+
+    try {
+      return await execAsync(fullCommand)
+    }
+    catch (error: any) {
+      if (error.code === 'ENOENT') {
+        throw new Error(
+          `npm command not found: ${this.npmCommand}. `
+          + `Please ensure npm is installed or specify a custom npm path using the 'npmPath' option.`
+        )
+      }
+      throw error
+    }
+  }
+
+  async install(packageName: string, version?: string): Promise<void> {
+    await ensureDir(this.pluginDir)
+
+    const versionSpec = version ? `@${version}` : ''
+    const command = `install ${packageName}${versionSpec} --prefix "${this.pluginDir}" --registry ${this.registry}`
+
+    try {
+      await this.executeNpmCommand(command)
+    }
+    catch (error: any) {
+      throw new Error(`Failed to install plugin ${packageName}: ${error.message}`)
+    }
+  }
+
+  async uninstall(packageName: string): Promise<void> {
+    const packagePath = join(this.pluginDir, 'node_modules', packageName)
+
+    if (!(await pathExists(packagePath))) {
+      throw new Error(`Plugin ${packageName} is not installed`)
+    }
+
+    const command = `uninstall ${packageName} --prefix "${this.pluginDir}"`
+
+    try {
+      await this.executeNpmCommand(command)
+    }
+    catch (error: any) {
+      throw new Error(`Failed to uninstall plugin ${packageName}: ${error.message}`)
+    }
+  }
+
+  async list(): Promise<Record<string, any>> {
+    const command = `list --prefix "${this.pluginDir}" --depth=0 --json`
+
+    try {
+      const { stdout } = await this.executeNpmCommand(command)
+      return JSON.parse(stdout).dependencies || {}
+    }
+    catch (error: any) {
+      // npm list returns error code when no dependencies, but still has JSON output
+      if (error.stdout) {
+        try {
+          return JSON.parse(error.stdout).dependencies || {}
+        }
+        catch {
+          return {}
+        }
+      }
+      return {}
+    }
+  }
+
+  async search(keyword: string): Promise<any[]> {
+    const command = `search ${keyword} --json --registry ${this.registry}`
+
+    try {
+      const { stdout } = await this.executeNpmCommand(command)
+      return JSON.parse(stdout)
+    }
+    catch (error: any) {
+      throw new Error(`Failed to search plugins: ${error.message}`)
+    }
+  }
+
+  async isInstalled(packageName: string): Promise<boolean> {
+    const packagePath = join(this.pluginDir, 'node_modules', packageName)
+    return await pathExists(packagePath)
+  }
+
+  async getInstalledVersion(packageName: string): Promise<string | null> {
+    const packageJsonPath = join(this.pluginDir, 'node_modules', packageName, 'package.json')
+
+    if (!(await pathExists(packageJsonPath))) {
+      return null
+    }
+
+    try {
+      const packageJson = await readJSON(packageJsonPath)
+      return packageJson.version
+    }
+    catch {
+      return null
+    }
+  }
+}

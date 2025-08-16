@@ -5,6 +5,7 @@ export default defineBuildConfig({
     'src/index'
   ],
   rollup: {
+    emitCJS: true,
     esbuild: {
       minify: true
     },
