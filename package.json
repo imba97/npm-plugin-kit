@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.1.0",
   "packageManager": "pnpm@10.14.0",
-  "description": "Plug-in system kit based on npm",
+  "description": "A simple and powerful npm-based plugin system",
   "author": "imba97",
   "license": "MIT",
   "homepage": "https://github.com/imba97/npm-plugin-kit#readme",
