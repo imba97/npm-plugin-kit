@@ -38,6 +38,7 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
     return Object.entries(installed).map(([name, info]) => ({
       name,
       version: info.version,
+      description: info.description,
       isLocal: isLocalPath(info.resolved)
     }))
   }

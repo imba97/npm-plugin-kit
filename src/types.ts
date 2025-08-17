@@ -36,6 +36,7 @@ export interface SearchResult {
 export interface PluginInfo {
   name: string
   version: string
+  description: string
   isLocal: boolean
 }
 
