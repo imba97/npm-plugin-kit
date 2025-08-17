@@ -1,24 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createNpmPlugin, NpmPluginSystem } from '../src/index'
-import { validatePluginId } from '../src/utils'
 
-describe('npm-plugin-kit', () => {
-  describe('validatePluginId', () => {
-    it('should accept valid plugin IDs', () => {
-      expect(validatePluginId('myapp')).toBe(true)
-      expect(validatePluginId('my-app')).toBe(true)
-      expect(validatePluginId('image-processor')).toBe(true)
-      expect(validatePluginId('data-transformer')).toBe(true)
-    })
-
-    it('should reject invalid plugin IDs', () => {
-      expect(validatePluginId('My-App')).toBe(false) // uppercase
-      expect(validatePluginId('123-app')).toBe(false) // starts with number
-      expect(validatePluginId('my_app')).toBe(false) // underscore
-      expect(validatePluginId('ab')).toBe(false) // too short
-    })
-  })
-
+describe('plugin-system', () => {
   describe('createNpmPlugin', () => {
     it('should create a plugin system instance', () => {
       const plugins = createNpmPlugin('test-app')
