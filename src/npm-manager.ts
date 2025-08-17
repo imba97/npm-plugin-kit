@@ -3,6 +3,7 @@ import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { ensureDir, pathExists, readJSON } from 'fs-extra'
 import { join } from 'pathe'
+import { PluginCache } from './cache'
 import { isLocalPath, resolveLocalPath, validateLocalPath } from './utils'
 
 const execAsync = promisify(exec)
@@ -15,6 +16,7 @@ interface NpmManagerOptions {
 export class NpmManager {
   private readonly registry: string
   private readonly npmCommand: string
+  private readonly cache: PluginCache
 
   constructor(
     private pluginDir: string,
@@ -22,6 +24,7 @@ export class NpmManager {
   ) {
     this.registry = options.registry || 'https://registry.npmjs.org'
     this.npmCommand = options.npmPath || 'npm'
+    this.cache = new PluginCache(pluginDir)
   }
 
   private async executeNpmCommand(command: string): Promise<{ stdout: string, stderr: string }> {
@@ -49,6 +52,11 @@ export class NpmManager {
     }
     else {
       await this.installFromRegistry(packageName, version)
+    }
+
+    const info = await this.getPackageInfo(packageName)
+    if (info) {
+      await this.cache.updateOne(packageName, info)
     }
   }
 
@@ -92,6 +100,7 @@ export class NpmManager {
 
     try {
       await this.executeNpmCommand(command)
+      await this.cache.removeOne(packageName)
     }
     catch (error: any) {
       throw new Error(`Failed to uninstall plugin ${packageName}: ${error.message}`)
@@ -99,23 +108,65 @@ export class NpmManager {
   }
 
   async list(): Promise<Record<string, NpmPackageInfo>> {
-    const command = `list --prefix "${this.pluginDir}" --depth=0 --json`
+    const cacheData = await this.cache.read()
+    if (Object.keys(cacheData).length > 0) {
+      return cacheData
+    }
 
+    const command = `list --prefix "${this.pluginDir}" --depth=0 --json`
+    let dependencies: Record<string, NpmPackageInfo> = {}
     try {
       const { stdout } = await this.executeNpmCommand(command)
-      return JSON.parse(stdout).dependencies || {}
+      dependencies = JSON.parse(stdout).dependencies || {}
     }
     catch (error: any) {
-      // npm list returns error code when no dependencies, but still has JSON output
       if (error.stdout) {
         try {
-          return JSON.parse(error.stdout).dependencies || {}
+          dependencies = JSON.parse(error.stdout).dependencies || {}
         }
         catch {
-          return {}
+          dependencies = {}
         }
       }
-      return {}
+    }
+
+    for (const [pkg, info] of Object.entries(dependencies)) {
+      const desc = await this.getPackageDescription(pkg)
+      info.description = desc
+    }
+
+    await this.cache.rebuild(dependencies)
+    return dependencies
+  }
+
+  private async getPackageInfo(packageName: string): Promise<NpmPackageInfo | null> {
+    const packageJsonPath = join(this.pluginDir, 'node_modules', packageName, 'package.json')
+    if (!(await pathExists(packageJsonPath)))
+      return null
+    try {
+      const pkg = await readJSON(packageJsonPath)
+      return {
+        version: pkg.version,
+        resolved: '',
+        overridden: false,
+        description: pkg.description || ''
+      }
+    }
+    catch {
+      return null
+    }
+  }
+
+  private async getPackageDescription(packageName: string): Promise<string> {
+    const packageJsonPath = join(this.pluginDir, 'node_modules', packageName, 'package.json')
+    if (!(await pathExists(packageJsonPath)))
+      return ''
+    try {
+      const pkg = await readJSON(packageJsonPath)
+      return pkg.description || ''
+    }
+    catch {
+      return ''
     }
   }
 

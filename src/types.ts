@@ -30,7 +30,7 @@ export interface PluginSystem<T = any> {
 export interface SearchResult {
   name: string
   version: string
-  description?: string
+  description: string
 }
 
 export interface PluginInfo {
@@ -43,4 +43,5 @@ export interface NpmPackageInfo {
   version: string
   resolved: string
   overridden: boolean
+  description: string
 }
