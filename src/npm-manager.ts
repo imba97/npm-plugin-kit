@@ -1,3 +1,4 @@
+import type { NpmPackageInfo } from './types'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { ensureDir, pathExists, readJSON } from 'fs-extra'
@@ -97,7 +98,7 @@ export class NpmManager {
     }
   }
 
-  async list(): Promise<Record<string, any>> {
+  async list(): Promise<Record<string, NpmPackageInfo>> {
     const command = `list --prefix "${this.pluginDir}" --depth=0 --json`
 
     try {

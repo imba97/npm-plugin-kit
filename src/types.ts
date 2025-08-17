@@ -36,4 +36,11 @@ export interface SearchResult {
 export interface PluginInfo {
   name: string
   version: string
+  isLocal: boolean
+}
+
+export interface NpmPackageInfo {
+  version: string
+  resolved: string
+  overridden: boolean
 }

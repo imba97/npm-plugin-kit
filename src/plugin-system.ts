@@ -1,7 +1,7 @@
 import type { PluginInfo, PluginOptions, PluginSystem, SearchResult } from './types'
 import { NpmManager } from './npm-manager'
 import { PluginLoader } from './plugin-loader'
-import { getPluginDir, validatePluginId } from './utils'
+import { getPluginDir, isLocalPath, validatePluginId } from './utils'
 
 export class NpmPluginSystem<T = any> implements PluginSystem<T> {
   private readonly npmManager: NpmManager
@@ -37,7 +37,8 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
     const installed = await this.npmManager.list()
     return Object.entries(installed).map(([name, info]) => ({
       name,
-      version: (info as any).version
+      version: info.version,
+      isLocal: isLocalPath(info.resolved)
     }))
   }
 
