@@ -2,6 +2,7 @@ import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { ensureDir, pathExists, readJSON } from 'fs-extra'
 import { join } from 'pathe'
+import { isLocalPath, resolveLocalPath, validateLocalPath } from './utils'
 
 const execAsync = promisify(exec)
 
@@ -42,6 +43,32 @@ export class NpmManager {
   async install(packageName: string, version?: string): Promise<void> {
     await ensureDir(this.pluginDir)
 
+    if (isLocalPath(packageName)) {
+      await this.installFromLocal(packageName)
+    }
+    else {
+      await this.installFromRegistry(packageName, version)
+    }
+  }
+
+  private async installFromLocal(packageName: string): Promise<void> {
+    const localPath = resolveLocalPath(packageName)
+
+    if (!(await validateLocalPath(localPath))) {
+      throw new Error(`Local path does not exist or does not contain a valid package.json: ${localPath}`)
+    }
+
+    const command = `install "${localPath}" --prefix "${this.pluginDir}"`
+
+    try {
+      await this.executeNpmCommand(command)
+    }
+    catch (error: any) {
+      throw new Error(`Failed to install plugin from local path ${localPath}: ${error.message}`)
+    }
+  }
+
+  private async installFromRegistry(packageName: string, version?: string): Promise<void> {
     const versionSpec = version ? `@${version}` : ''
     const command = `install ${packageName}${versionSpec} --prefix "${this.pluginDir}" --registry ${this.registry}`
 
