@@ -1,4 +1,5 @@
 import type { PluginInfo, PluginOptions, PluginSystem, SearchResult } from './types'
+import { join } from 'pathe'
 import { NpmManager } from './npm-manager'
 import { PluginLoader } from './plugin-loader'
 import { getPluginDir, isLocalPath, validatePluginId } from './utils'
@@ -6,6 +7,7 @@ import { getPluginDir, isLocalPath, validatePluginId } from './utils'
 export class NpmPluginSystem<T = any> implements PluginSystem<T> {
   private readonly npmManager: NpmManager
   private readonly pluginLoader: PluginLoader
+  private readonly pluginDir: string
 
   constructor(id: string, options: PluginOptions = {}) {
     if (!validatePluginId(id)) {
@@ -13,6 +15,7 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
     }
 
     const pluginDir = getPluginDir(id, options)
+    this.pluginDir = pluginDir
     this.npmManager = new NpmManager(pluginDir, {
       registry: options.registry,
       npmPath: options.npmPath
@@ -50,5 +53,12 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
 
   async load(packageName: string): Promise<T> {
     return await this.pluginLoader.load(packageName)
+  }
+
+  resolve(packageName: string, ...paths: string[]): string {
+    const base = join(this.pluginDir, 'node_modules', packageName)
+    if (paths.length === 0)
+      return base
+    return join(base, ...paths)
   }
 }

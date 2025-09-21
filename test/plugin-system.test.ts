@@ -48,5 +48,18 @@ describe('plugin-system', () => {
     it('should throw error for invalid plugin ID when created directly', () => {
       expect(() => new NpmPluginSystem('Invalid-ID')).toThrow('Invalid plugin ID')
     })
+
+    it('should resolve plugin package path correctly', () => {
+      const system = new NpmPluginSystem('test-resolve')
+
+      const basePath = system.resolve('my-plugin')
+      expect(basePath).toContain('node_modules/my-plugin')
+      expect(basePath).toContain('.test-resolve')
+
+      const filePath = system.resolve('my-plugin', 'assets', 'logo.png')
+      expect(filePath).toContain('node_modules/my-plugin')
+      expect(filePath).toContain('assets')
+      expect(filePath).toContain('logo.png')
+    })
   })
 })
