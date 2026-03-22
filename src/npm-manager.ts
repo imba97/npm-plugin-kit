@@ -44,24 +44,26 @@ export class NpmManager {
     }
   }
 
-  async install(packageName: string, version?: string): Promise<void> {
+  async install(spec: string, version?: string): Promise<void> {
     await ensureDir(this.pluginDir)
 
-    if (isLocalPath(packageName)) {
-      await this.installFromLocal(packageName)
-    }
-    else {
-      await this.installFromRegistry(packageName, version)
+    if (isLocalPath(spec)) {
+      await this.installFromLocal(spec)
+      const { name, info } = await this.getLocalPackageInfo(spec)
+      await this.cache.updateOne(name, info)
+      return
     }
 
-    const info = await this.getPackageInfo(packageName)
-    if (info) {
-      await this.cache.updateOne(packageName, info)
+    await this.installFromRegistry(spec, version)
+    const info = await this.getPackageInfo(spec)
+    if (!info) {
+      throw new Error(`Failed to get package info for ${spec}, package.json may not exist`)
     }
+    await this.cache.updateOne(spec, info)
   }
 
-  private async installFromLocal(packageName: string): Promise<void> {
-    const localPath = resolveLocalPath(packageName)
+  private async installFromLocal(spec: string): Promise<void> {
+    const localPath = resolveLocalPath(spec)
 
     if (!(await validateLocalPath(localPath))) {
       throw new Error(`Local path does not exist or does not contain a valid package.json: ${localPath}`)
@@ -137,6 +139,26 @@ export class NpmManager {
 
     await this.cache.rebuild(dependencies)
     return dependencies
+  }
+
+  private async getLocalPackageInfo(spec: string): Promise<{ name: string, info: NpmPackageInfo }> {
+    const localPath = resolveLocalPath(spec)
+    const pkg = await readJSON(join(localPath, 'package.json'))
+    const name = pkg.name
+
+    if (typeof name !== 'string' || name.length === 0) {
+      throw new Error(`Local package at ${localPath} must define a valid name in package.json`)
+    }
+
+    return {
+      name,
+      info: {
+        version: pkg.version || '',
+        resolved: '',
+        overridden: false,
+        description: pkg.description || ''
+      }
+    }
   }
 
   private async getPackageInfo(packageName: string): Promise<NpmPackageInfo | null> {
