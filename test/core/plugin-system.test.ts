@@ -82,13 +82,13 @@ describe('plugin-system', () => {
       expect(filePath).toContain('logo.png')
     })
 
-    it('should return list items with name, package and plugin sections', async () => {
+    it('should return list items with name, packageInfo and plugin sections', async () => {
       const system = new NpmPluginSystem('test-list')
       const npmManager = (system as any).npmManager
 
       vi.spyOn(npmManager, 'list').mockResolvedValue({
         'my-plugin': {
-          package: {
+          packageInfo: {
             version: '1.0.0',
             description: 'desc',
             author: 'Alice',
@@ -105,7 +105,7 @@ describe('plugin-system', () => {
 
       expect(list).toEqual([{
         name: 'my-plugin',
-        package: {
+        packageInfo: {
           version: '1.0.0',
           description: 'desc',
           author: 'Alice',

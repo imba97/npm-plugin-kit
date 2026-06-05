@@ -20,12 +20,12 @@ describe('cache-migrate', () => {
     })).toBe(true)
 
     expect(isV1CacheEntry({
-      package: { version: '1.0.0', description: 'demo', author: 'Alice' },
+      packageInfo: { version: '1.0.0', description: 'demo', author: 'Alice' },
       plugin: { root: '/tmp/node_modules/pkg', isLocal: false }
     })).toBe(true)
 
     expect(isLegacyCacheEntry({
-      package: { version: '1.0.0', description: 'demo', author: 'Alice' },
+      packageInfo: { version: '1.0.0', description: 'demo', author: 'Alice' },
       plugin: { root: '/tmp/node_modules/pkg', isLocal: false }
     })).toBe(false)
   })
@@ -53,7 +53,7 @@ describe('cache-migrate', () => {
     }, pluginDir)
 
     expect(registryEntry).toEqual({
-      package: { version: '1.0.0', description: 'demo', author: undefined },
+      packageInfo: { version: '1.0.0', description: 'demo', author: undefined },
       plugin: { root: join(pluginDir, 'node_modules', 'pkg'), isLocal: false }
     })
 
@@ -76,18 +76,18 @@ describe('cache-migrate', () => {
         description: 'old'
       },
       modern: {
-        package: { version: '2.0.0', description: 'new', author: 'Bob' },
+        packageInfo: { version: '2.0.0', description: 'new', author: 'Bob' },
         plugin: { root: join(pluginDir, 'node_modules', 'modern'), isLocal: false }
       }
     }, pluginDir)
 
-    expect(migrated.legacy.package).toEqual({
+    expect(migrated.legacy.packageInfo).toEqual({
       version: '1.0.0',
       description: 'old',
       author: undefined
     })
     expect(migrated.modern).toEqual({
-      package: { version: '2.0.0', description: 'new', author: 'Bob' },
+      packageInfo: { version: '2.0.0', description: 'new', author: 'Bob' },
       plugin: { root: join(pluginDir, 'node_modules', 'modern'), isLocal: false }
     })
   })

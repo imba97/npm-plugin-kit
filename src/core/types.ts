@@ -18,7 +18,7 @@ export interface PluginOptions {
   npmPath?: string
 
   /**
-   * Extra fields to extract from installed plugin package.json into cache `package` section.
+   * Extra fields to extract from installed plugin package.json into cache `packageInfo` section.
    * - `true` — read pkgJson[pluginSystemId]
    * - `string` — dot-path field, e.g. 'repository.url'
    * - `string[]` — multiple dot-path fields
@@ -32,14 +32,14 @@ export interface SearchResult {
   description: string
 }
 
-/** package.json built-in fields stored in cache `package` section */
+/** package.json built-in fields stored in cache `packageInfo` section */
 export interface PackageInfoBase {
   version: string
   description: string
   author: unknown
 }
 
-/** package section = built-in + user-defined fields from cacheFields */
+/** packageInfo section = built-in + user-defined fields from cacheFields */
 export type PackageInfo<T extends Record<string, unknown> = Record<string, unknown>>
   = PackageInfoBase & T
 
@@ -53,14 +53,14 @@ export interface PluginMeta {
 
 /** Cache value (key is package name) */
 export interface CachedPlugin<T extends Record<string, unknown> = Record<string, unknown>> {
-  package: PackageInfo<T>
+  packageInfo: PackageInfo<T>
   plugin: PluginMeta
 }
 
 /** list() return value */
 export interface PluginInfo<T extends Record<string, unknown> = Record<string, unknown>> {
   name: string
-  package: PackageInfo<T>
+  packageInfo: PackageInfo<T>
   plugin: PluginMeta
 }
 

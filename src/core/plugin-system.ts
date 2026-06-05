@@ -50,7 +50,7 @@ export class NpmPluginSystem<
     const installed = await this.npmManager.list()
     return Object.entries(installed).map(([name, entry]) => ({
       name,
-      package: entry.package as PluginInfo<TExtra>['package'],
+      packageInfo: entry.packageInfo as PluginInfo<TExtra>['packageInfo'],
       plugin: entry.plugin
     }))
   }

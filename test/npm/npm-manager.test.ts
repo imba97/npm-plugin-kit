@@ -1,8 +1,23 @@
+import type { MockInstance } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NpmManager } from '../../src/npm/npm-manager'
+
+interface NpmCommandResult {
+  stdout: string
+  stderr: string
+}
+
+type ExecuteNpmCommand = (command: string) => Promise<NpmCommandResult>
+
+function spyExecuteNpmCommand(manager: NpmManager): MockInstance<ExecuteNpmCommand> {
+  return vi.spyOn(
+    manager as unknown as { executeNpmCommand: ExecuteNpmCommand },
+    'executeNpmCommand'
+  )
+}
 
 const tempDirs: string[] = []
 
@@ -32,7 +47,7 @@ describe('npm-manager', () => {
 
     const manager = new NpmManager(pluginDir, { pluginId: 'test-app' })
 
-    vi.spyOn(manager as never, 'executeNpmCommand' as never).mockImplementation(async () => {
+    spyExecuteNpmCommand(manager).mockImplementation(async () => {
       const installedPackageDir = join(pluginDir, 'node_modules', 'local-plugin')
       await mkdir(installedPackageDir, { recursive: true })
       await writeFile(join(installedPackageDir, 'package.json'), JSON.stringify({
@@ -55,7 +70,7 @@ describe('npm-manager', () => {
 
     expect(cache).toEqual({
       'local-plugin': {
-        package: {
+        packageInfo: {
           version: '1.2.3',
           description: 'local plugin',
           author: 'Alice'
@@ -71,7 +86,7 @@ describe('npm-manager', () => {
     expect(JSON.parse(metaRaw)).toEqual({ cacheVersion: 1 })
   })
 
-  it('should write cacheFields into package section', async () => {
+  it('should write cacheFields into packageInfo section', async () => {
     const pluginDir = await createTempDir('npm-plugin-kit-plugin-dir-')
     const localPackageDir = await createTempDir('npm-plugin-kit-local-package-')
 
@@ -89,7 +104,7 @@ describe('npm-manager', () => {
       cacheFields: ['homepage', 'repository']
     })
 
-    vi.spyOn(manager as never, 'executeNpmCommand' as never).mockImplementation(async () => {
+    spyExecuteNpmCommand(manager).mockImplementation(async () => {
       const installedPackageDir = join(pluginDir, 'node_modules', 'extra-plugin')
       await mkdir(installedPackageDir, { recursive: true })
       await writeFile(join(installedPackageDir, 'package.json'), JSON.stringify({
@@ -106,7 +121,7 @@ describe('npm-manager', () => {
     await manager.install(localPackageDir)
 
     const cache = JSON.parse(await readFile(join(pluginDir, '.plugins.json'), 'utf-8'))
-    expect(cache['extra-plugin'].package).toMatchObject({
+    expect(cache['extra-plugin'].packageInfo).toMatchObject({
       homepage: 'https://example.com',
       repository: { type: 'git', url: 'git@github.com:example/repo.git' }
     })
@@ -143,7 +158,7 @@ describe('npm-manager', () => {
 
     expect(list).toEqual({
       'kept-plugin': {
-        package: {
+        packageInfo: {
           version: '1.0.0',
           description: 'still installed',
           author: 'Carol'
@@ -176,7 +191,7 @@ describe('npm-manager', () => {
 
     const manager = new NpmManager(pluginDir, { pluginId: 'test-app' })
 
-    vi.spyOn(manager as never, 'executeNpmCommand' as never).mockResolvedValue({
+    spyExecuteNpmCommand(manager).mockResolvedValue({
       stdout: JSON.stringify({
         dependencies: {
           'local-plugin': {
@@ -187,12 +202,12 @@ describe('npm-manager', () => {
         }
       }),
       stderr: ''
-    } as never)
+    })
 
     const list = await manager.list()
 
     expect(list['local-plugin'].plugin.isLocal).toBe(true)
-    expect(list['local-plugin'].package.author).toBe('Dev')
+    expect(list['local-plugin'].packageInfo.author).toBe('Dev')
   })
 
   it('should support cacheFields true to read pluginId block from package.json', async () => {
@@ -209,7 +224,7 @@ describe('npm-manager', () => {
 
     const manager = new NpmManager(pluginDir, { pluginId: 'test-app', cacheFields: true })
 
-    vi.spyOn(manager as never, 'executeNpmCommand' as never).mockImplementation(async () => {
+    spyExecuteNpmCommand(manager).mockImplementation(async () => {
       const installedPackageDir = join(pluginDir, 'node_modules', 'meta-plugin')
       await mkdir(installedPackageDir, { recursive: true })
       await writeFile(join(installedPackageDir, 'package.json'), JSON.stringify({
@@ -225,14 +240,14 @@ describe('npm-manager', () => {
     await manager.install(localPackageDir)
 
     const cache = JSON.parse(await readFile(join(pluginDir, '.plugins.json'), 'utf-8'))
-    expect(cache['meta-plugin'].package['test-app']).toEqual({ category: 'tool' })
+    expect(cache['meta-plugin'].packageInfo['test-app']).toEqual({ category: 'tool' })
   })
 
   it('should resolve exact package name via npm view', async () => {
     const pluginDir = await createTempDir('npm-plugin-kit-plugin-dir-')
     const manager = new NpmManager(pluginDir, { pluginId: 'test-app' })
 
-    const executeNpmCommand = vi.spyOn(manager as never, 'executeNpmCommand' as never)
+    const executeNpmCommand = spyExecuteNpmCommand(manager)
       .mockResolvedValue({
         stdout: JSON.stringify({
           name: 'initx-plugin-svg-writer',
@@ -240,7 +255,7 @@ describe('npm-manager', () => {
           description: 'Interactive SVG writer plugin for initx'
         }),
         stderr: ''
-      } as never)
+      })
 
     const result = await manager.view('initx-plugin-svg-writer')
 
@@ -258,8 +273,8 @@ describe('npm-manager', () => {
     const pluginDir = await createTempDir('npm-plugin-kit-plugin-dir-')
     const manager = new NpmManager(pluginDir, { pluginId: 'test-app' })
 
-    vi.spyOn(manager as never, 'executeNpmCommand' as never)
-      .mockRejectedValue(new Error('E404') as never)
+    spyExecuteNpmCommand(manager)
+      .mockRejectedValue(new Error('E404'))
 
     const result = await manager.view('missing-package')
 
@@ -273,8 +288,8 @@ describe('npm-manager', () => {
       registry: 'https://registry.example.com?q=1'
     })
 
-    const executeNpmCommand = vi.spyOn(manager as never, 'executeNpmCommand' as never)
-      .mockResolvedValue({ stdout: '[]', stderr: '' } as never)
+    const executeNpmCommand = spyExecuteNpmCommand(manager)
+      .mockResolvedValue({ stdout: '[]', stderr: '' })
 
     await manager.search(`plugin's name`)
 

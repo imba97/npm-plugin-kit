@@ -207,12 +207,12 @@ export class NpmManager {
       }
 
       result[pkg] = {
-        package: mergeMissingPackageFields(
-          entry.package as Record<string, unknown>,
+        packageInfo: mergeMissingPackageFields(
+          entry.packageInfo as Record<string, unknown>,
           pkgJson,
           this.pluginId,
           this.cacheFields
-        ) as CachedPlugin['package'],
+        ) as CachedPlugin['packageInfo'],
         plugin: mergeMissingPluginFields(entry.plugin, this.pluginDir, pkg)
       }
       changed = true

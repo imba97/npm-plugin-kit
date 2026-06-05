@@ -14,7 +14,7 @@ export function isV1CacheEntry(entry: unknown): entry is CachedPlugin {
   if (!entry || typeof entry !== 'object')
     return false
   const e = entry as Record<string, unknown>
-  return typeof e.package === 'object' && e.package !== null
+  return typeof e.packageInfo === 'object' && e.packageInfo !== null
     && typeof e.plugin === 'object' && e.plugin !== null
 }
 
@@ -40,7 +40,7 @@ export function migrateLegacyEntry(
 ): CachedPlugin {
   const resolved = typeof entry.resolved === 'string' ? entry.resolved : ''
   return {
-    package: {
+    packageInfo: {
       version: entry.version ?? '',
       description: entry.description ?? '',
       author: undefined

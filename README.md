@@ -38,15 +38,15 @@ const pluginSystem = createNpmPlugin('plugin-id', {
 
 ## Plugin List & Cache
 
-`list()` returns installed plugins with `package` (from `package.json`) and `plugin` (install metadata) separated:
+`list()` returns installed plugins with `packageInfo` (from `package.json`) and `plugin` (install metadata) separated:
 
 ```typescript
 const plugins = await pluginSystem.list()
 
 plugins[0].name // package name (cache key)
-plugins[0].package.version
-plugins[0].package.description
-plugins[0].package.author
+plugins[0].packageInfo.version
+plugins[0].packageInfo.description
+plugins[0].packageInfo.author
 plugins[0].plugin.root // absolute install directory
 plugins[0].plugin.isLocal // installed from local path
 ```
@@ -66,8 +66,8 @@ const pluginSystem = createNpmPlugin<MyPlugin, MyExtra>('my-app', {
 })
 
 const plugins = await pluginSystem.list()
-plugins[0].package.homepage
-plugins[0].package.repository.url
+plugins[0].packageInfo.homepage
+plugins[0].packageInfo.repository.url
 ```
 
 `cacheFields` supports three forms:
@@ -78,9 +78,9 @@ plugins[0].package.repository.url
 | `string` | Dot-path field, e.g. `'repository.url'` |
 | `string[]` | Multiple dot-path fields, e.g. `['homepage', 'repository']` |
 
-`author` is always included in `package` without configuring `cacheFields`.
+`author` is always included in `packageInfo` without configuring `cacheFields`.
 
-`list()` automatically fills missing `package` / `plugin` fields from installed `package.json` and filesystem.
+`list()` automatically fills missing `packageInfo` / `plugin` fields from installed `package.json` and filesystem.
 
 ### Cache Files
 
@@ -91,7 +91,7 @@ In the plugin directory (default `~/.{id}`):
 ```json
 {
   "my-plugin": {
-    "package": {
+    "packageInfo": {
       "version": "1.0.0",
       "description": "...",
       "author": "Alice"
@@ -125,7 +125,7 @@ Creates a plugin system instance.
 - `options.pluginDir` - Custom plugin directory (default: `~/.{id}`)
 - `options.registry` - Custom npm registry URL
 - `options.npmPath` - Custom npm executable path (default: `'npm'`)
-- `options.cacheFields` - Extra `package.json` fields to cache in `package` section
+- `options.cacheFields` - Extra `package.json` fields to cache in `packageInfo` section
 
 **Returns:** `PluginSystem<TPlugin, TExtra>`
 

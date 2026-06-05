@@ -76,7 +76,7 @@ export function buildCacheEntry(
   cacheFields?: CacheFields
 ): CachedPlugin {
   return {
-    package: {
+    packageInfo: {
       ...getBuiltinPackageFields(pkgJson),
       ...extractPackageFields(pkgJson, pluginId, cacheFields)
     },
@@ -135,7 +135,7 @@ export function hasMissingFields(
   pluginId: string,
   cacheFields?: CacheFields
 ): boolean {
-  return hasMissingPackageFields(entry.package as Record<string, unknown>, pluginId, cacheFields)
+  return hasMissingPackageFields(entry.packageInfo as Record<string, unknown>, pluginId, cacheFields)
     || hasMissingPluginFields(entry.plugin)
 }
 
