@@ -25,6 +25,7 @@ export interface PluginSystem<T = any> {
   list: () => Promise<PluginInfo[]>
   update: (packageName: string, version?: string) => Promise<void>
   load: (packageName: string) => Promise<T>
+  resolve: (packageName: string, ...paths: string[]) => string
 }
 
 export interface SearchResult {

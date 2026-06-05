@@ -1,3 +1,4 @@
+import type { PluginOptions } from './types'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { cwd } from 'node:process'
@@ -24,7 +25,11 @@ export function validatePluginId(pluginId: string): boolean {
   return /^[a-z][a-z0-9-]*$/.test(pluginId) && pluginId.length >= 3
 }
 
-export function getPluginDir(pluginId: string, options?: any): string {
+export function shellEscape(arg: string): string {
+  return `'${arg.replace(/'/g, `'\\''`)}'`
+}
+
+export function getPluginDir(pluginId: string, options?: PluginOptions): string {
   if (options?.pluginDir) {
     return typeof options.pluginDir === 'function'
       ? options.pluginDir()
@@ -66,4 +71,35 @@ export async function validateLocalPath(localPath: string): Promise<boolean> {
   catch {
     return false
   }
+}
+
+interface PackageJsonEntry {
+  main?: string
+  module?: string
+  exports?: string | Record<string, string | Record<string, string>>
+}
+
+export function resolvePackageEntry(packagePath: string, packageJson: PackageJsonEntry): string {
+  if (packageJson.main)
+    return join(packagePath, packageJson.main)
+
+  if (packageJson.module)
+    return join(packagePath, packageJson.module)
+
+  const exports = packageJson.exports
+  if (exports) {
+    if (typeof exports === 'string')
+      return join(packagePath, exports)
+
+    const dot = exports['.']
+    if (dot) {
+      if (typeof dot === 'string')
+        return join(packagePath, dot)
+      const subpath = dot.import || dot.require || dot.default
+      if (typeof subpath === 'string')
+        return join(packagePath, subpath)
+    }
+  }
+
+  return join(packagePath, 'index.js')
 }

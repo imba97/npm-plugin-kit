@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isLocalPath, resolveLocalPath, validatePluginId } from '../src/utils'
+import { isLocalPath, resolveLocalPath, resolvePackageEntry, shellEscape, validatePluginId } from '../src/utils'
 
 describe('utils', () => {
   describe('isLocalPath', () => {
@@ -46,6 +46,34 @@ describe('utils', () => {
     it('should handle absolute paths', () => {
       const result = resolveLocalPath('/absolute/path')
       expect(result).toBe('/absolute/path')
+    })
+  })
+
+  describe('shellEscape', () => {
+    it('should wrap arguments in single quotes', () => {
+      expect(shellEscape('my-plugin')).toBe(`'my-plugin'`)
+      expect(shellEscape(`it's fine`)).toBe(`'it'\\''s fine'`)
+    })
+  })
+
+  describe('resolvePackageEntry', () => {
+    it('should prefer main over module and exports', () => {
+      const entry = resolvePackageEntry('/pkg', {
+        main: 'main.js',
+        module: 'module.js',
+        exports: './exports.js'
+      })
+      expect(entry).toBe('/pkg/main.js')
+    })
+
+    it('should fall back to module and exports', () => {
+      expect(resolvePackageEntry('/pkg', { module: 'esm.js' })).toBe('/pkg/esm.js')
+      expect(resolvePackageEntry('/pkg', { exports: './dist/index.js' })).toBe('/pkg/dist/index.js')
+      expect(resolvePackageEntry('/pkg', { exports: { '.': { import: './dist/index.mjs' } } })).toBe('/pkg/dist/index.mjs')
+    })
+
+    it('should default to index.js', () => {
+      expect(resolvePackageEntry('/pkg', {})).toBe('/pkg/index.js')
     })
   })
 

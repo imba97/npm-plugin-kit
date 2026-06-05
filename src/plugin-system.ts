@@ -28,6 +28,7 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
   }
 
   async install(packageName: string, version?: string): Promise<void> {
+    this.pluginLoader.unload(packageName)
     await this.npmManager.install(packageName, version)
   }
 
@@ -47,8 +48,8 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
   }
 
   async update(packageName: string, version?: string): Promise<void> {
-    await this.uninstall(packageName)
-    await this.install(packageName, version)
+    this.pluginLoader.unload(packageName)
+    await this.npmManager.install(packageName, version)
   }
 
   async load(packageName: string): Promise<T> {

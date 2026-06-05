@@ -1,9 +1,9 @@
-import type { NpmPackageInfo } from './types'
+import type { NpmPackageInfo, SearchResult } from './types'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { join } from 'pathe'
 import { PluginCache } from './cache'
-import { ensureDir, isLocalPath, pathExists, readJsonFile, resolveLocalPath, validateLocalPath } from './utils'
+import { ensureDir, isLocalPath, pathExists, readJsonFile, resolveLocalPath, shellEscape, validateLocalPath } from './utils'
 
 const execAsync = promisify(exec)
 
@@ -68,7 +68,7 @@ export class NpmManager {
       throw new Error(`Local path does not exist or does not contain a valid package.json: ${localPath}`)
     }
 
-    const command = `install "${localPath}" --prefix "${this.pluginDir}"`
+    const command = `install ${shellEscape(localPath)} --prefix ${shellEscape(this.pluginDir)}`
 
     try {
       await this.executeNpmCommand(command)
@@ -80,7 +80,7 @@ export class NpmManager {
 
   private async installFromRegistry(packageName: string, version?: string): Promise<void> {
     const versionSpec = version ? `@${version}` : ''
-    const command = `install ${packageName}${versionSpec} --prefix "${this.pluginDir}" --registry ${this.registry}`
+    const command = `install ${shellEscape(`${packageName}${versionSpec}`)} --prefix ${shellEscape(this.pluginDir)} --registry ${shellEscape(this.registry)}`
 
     try {
       await this.executeNpmCommand(command)
@@ -97,7 +97,7 @@ export class NpmManager {
       throw new Error(`Plugin ${packageName} is not installed`)
     }
 
-    const command = `uninstall ${packageName} --prefix "${this.pluginDir}"`
+    const command = `uninstall ${shellEscape(packageName)} --prefix ${shellEscape(this.pluginDir)}`
 
     try {
       await this.executeNpmCommand(command)
@@ -111,10 +111,16 @@ export class NpmManager {
   async list(): Promise<Record<string, NpmPackageInfo>> {
     const cacheData = await this.cache.read()
     if (Object.keys(cacheData).length > 0) {
-      return cacheData
+      const validated = await this.validateCache(cacheData)
+      if (Object.keys(validated).length > 0) {
+        if (Object.keys(validated).length !== Object.keys(cacheData).length) {
+          await this.cache.rebuild(validated)
+        }
+        return validated
+      }
     }
 
-    const command = `list --prefix "${this.pluginDir}" --depth=0 --json`
+    const command = `list --prefix ${shellEscape(this.pluginDir)} --depth=0 --json`
     let dependencies: Record<string, NpmPackageInfo> = {}
     try {
       const { stdout } = await this.executeNpmCommand(command)
@@ -131,13 +137,28 @@ export class NpmManager {
       }
     }
 
-    for (const [pkg, info] of Object.entries(dependencies)) {
-      const desc = await this.getPackageDescription(pkg)
-      info.description = desc
-    }
+    await Promise.all(
+      Object.entries(dependencies).map(async ([pkg, info]) => {
+        const pkgJson = await this.readInstalledPackageJson(pkg)
+        info.description = pkgJson?.description || ''
+      })
+    )
 
     await this.cache.rebuild(dependencies)
     return dependencies
+  }
+
+  private async validateCache(cacheData: Record<string, NpmPackageInfo>): Promise<Record<string, NpmPackageInfo>> {
+    const entries = await Promise.all(
+      Object.entries(cacheData).map(async ([pkg, info]) => {
+        const packagePath = join(this.pluginDir, 'node_modules', pkg)
+        if (!(await pathExists(packagePath)))
+          return null
+        return [pkg, info] as const
+      })
+    )
+
+    return Object.fromEntries(entries.filter(entry => entry !== null))
   }
 
   private async getLocalPackageInfo(spec: string): Promise<{ name: string, info: NpmPackageInfo }> {
@@ -160,39 +181,32 @@ export class NpmManager {
     }
   }
 
+  private async readInstalledPackageJson(packageName: string): Promise<Record<string, any> | null> {
+    const packageJsonPath = join(this.pluginDir, 'node_modules', packageName, 'package.json')
+    if (!(await pathExists(packageJsonPath)))
+      return null
+    try {
+      return await readJsonFile(packageJsonPath)
+    }
+    catch {
+      return null
+    }
+  }
+
   private async getPackageInfo(packageName: string): Promise<NpmPackageInfo | null> {
-    const packageJsonPath = join(this.pluginDir, 'node_modules', packageName, 'package.json')
-    if (!(await pathExists(packageJsonPath)))
+    const pkg = await this.readInstalledPackageJson(packageName)
+    if (!pkg)
       return null
-    try {
-      const pkg = await readJsonFile(packageJsonPath)
-      return {
-        version: pkg.version,
-        resolved: '',
-        overridden: false,
-        description: pkg.description || ''
-      }
-    }
-    catch {
-      return null
+    return {
+      version: pkg.version,
+      resolved: '',
+      overridden: false,
+      description: pkg.description || ''
     }
   }
 
-  private async getPackageDescription(packageName: string): Promise<string> {
-    const packageJsonPath = join(this.pluginDir, 'node_modules', packageName, 'package.json')
-    if (!(await pathExists(packageJsonPath)))
-      return ''
-    try {
-      const pkg = await readJsonFile(packageJsonPath)
-      return pkg.description || ''
-    }
-    catch {
-      return ''
-    }
-  }
-
-  async search(keyword: string): Promise<any[]> {
-    const command = `search ${keyword} --json --registry ${this.registry}`
+  async search(keyword: string): Promise<SearchResult[]> {
+    const command = `search ${shellEscape(keyword)} --json --registry ${shellEscape(this.registry)}`
 
     try {
       const { stdout } = await this.executeNpmCommand(command)
@@ -209,18 +223,7 @@ export class NpmManager {
   }
 
   async getInstalledVersion(packageName: string): Promise<string | null> {
-    const packageJsonPath = join(this.pluginDir, 'node_modules', packageName, 'package.json')
-
-    if (!(await pathExists(packageJsonPath))) {
-      return null
-    }
-
-    try {
-      const packageJson = await readJsonFile(packageJsonPath)
-      return packageJson.version
-    }
-    catch {
-      return null
-    }
+    const pkg = await this.readInstalledPackageJson(packageName)
+    return pkg?.version ?? null
   }
 }

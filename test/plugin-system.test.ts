@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createNpmPlugin, NpmPluginSystem } from '../src/index'
 
 describe('plugin-system', () => {
@@ -47,6 +47,23 @@ describe('plugin-system', () => {
 
     it('should throw error for invalid plugin ID when created directly', () => {
       expect(() => new NpmPluginSystem('Invalid-ID')).toThrow('Invalid plugin ID')
+    })
+
+    it('should clear loader cache before install and update', async () => {
+      const system = new NpmPluginSystem('test-cache')
+      const pluginLoader = (system as any).pluginLoader
+      const npmManager = (system as any).npmManager
+
+      pluginLoader.cache.set('my-plugin', { cached: true })
+      vi.spyOn(npmManager, 'install').mockResolvedValue(undefined)
+
+      await system.install('my-plugin', '1.0.0')
+      expect(pluginLoader.cache.has('my-plugin')).toBe(false)
+
+      pluginLoader.cache.set('my-plugin', { cached: true })
+      await system.update('my-plugin', '2.0.0')
+      expect(pluginLoader.cache.has('my-plugin')).toBe(false)
+      expect(npmManager.install).toHaveBeenCalledWith('my-plugin', '2.0.0')
     })
 
     it('should resolve plugin package path correctly', () => {
