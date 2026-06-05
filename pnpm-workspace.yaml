@@ -1,3 +1,7 @@
-onlyBuiltDependencies:
-  - esbuild
-  - simple-git-hooks
+shellEmulator: true
+
+trustPolicy: no-downgrade
+
+allowBuilds:
+  esbuild: true
+  simple-git-hooks: true

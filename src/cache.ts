@@ -1,7 +1,7 @@
 import type { NpmPackageInfo } from './types'
-import { pathExists, readJSON, writeJSON } from 'fs-extra'
 import { join } from 'pathe'
 import { PLUGINS_CACHE_FILE } from './constants'
+import { pathExists, readJsonFile, writeJsonFile } from './utils'
 
 export class PluginCache {
   private cachePath: string
@@ -13,11 +13,11 @@ export class PluginCache {
   async read(): Promise<Record<string, NpmPackageInfo>> {
     if (!(await pathExists(this.cachePath)))
       return {}
-    return await readJSON(this.cachePath)
+    return await readJsonFile(this.cachePath)
   }
 
   async write(data: Record<string, NpmPackageInfo>): Promise<void> {
-    await writeJSON(this.cachePath, data)
+    await writeJsonFile(this.cachePath, data)
   }
 
   async updateOne(pkg: string, info: NpmPackageInfo): Promise<void> {

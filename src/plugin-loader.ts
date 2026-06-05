@@ -1,5 +1,5 @@
-import { pathExists, readJSON } from 'fs-extra'
 import { join } from 'pathe'
+import { pathExists, readJsonFile } from './utils'
 
 export class PluginLoader<T = any> {
   private cache = new Map<string, T>()
@@ -24,7 +24,7 @@ export class PluginLoader<T = any> {
       throw new Error(`Plugin package not found: ${packageName}`)
     }
 
-    const packageJson = await readJSON(packageJsonPath)
+    const packageJson = await readJsonFile(packageJsonPath)
     const entryPath = join(packagePath, packageJson.main || 'index.js')
 
     try {

@@ -1,10 +1,9 @@
 import type { NpmPackageInfo } from './types'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
-import { ensureDir, pathExists, readJSON } from 'fs-extra'
 import { join } from 'pathe'
 import { PluginCache } from './cache'
-import { isLocalPath, resolveLocalPath, validateLocalPath } from './utils'
+import { ensureDir, isLocalPath, pathExists, readJsonFile, resolveLocalPath, validateLocalPath } from './utils'
 
 const execAsync = promisify(exec)
 
@@ -143,7 +142,7 @@ export class NpmManager {
 
   private async getLocalPackageInfo(spec: string): Promise<{ name: string, info: NpmPackageInfo }> {
     const localPath = resolveLocalPath(spec)
-    const pkg = await readJSON(join(localPath, 'package.json'))
+    const pkg = await readJsonFile(join(localPath, 'package.json'))
     const name = pkg.name
 
     if (typeof name !== 'string' || name.length === 0) {
@@ -166,7 +165,7 @@ export class NpmManager {
     if (!(await pathExists(packageJsonPath)))
       return null
     try {
-      const pkg = await readJSON(packageJsonPath)
+      const pkg = await readJsonFile(packageJsonPath)
       return {
         version: pkg.version,
         resolved: '',
@@ -184,7 +183,7 @@ export class NpmManager {
     if (!(await pathExists(packageJsonPath)))
       return ''
     try {
-      const pkg = await readJSON(packageJsonPath)
+      const pkg = await readJsonFile(packageJsonPath)
       return pkg.description || ''
     }
     catch {
@@ -217,7 +216,7 @@ export class NpmManager {
     }
 
     try {
-      const packageJson = await readJSON(packageJsonPath)
+      const packageJson = await readJsonFile(packageJsonPath)
       return packageJson.version
     }
     catch {
