@@ -1,9 +1,23 @@
-import type { PluginInfo, PluginOptions, PluginSystem } from './types'
-import { NpmPluginSystem } from './plugin-system'
+import type { PluginOptions, PluginSystem } from './core/types'
+import { NpmPluginSystem } from './core/plugin-system'
 
-export function createNpmPlugin<T = any>(id: string, options: PluginOptions = {}): PluginSystem<T> {
-  return new NpmPluginSystem<T>(id, options)
+export function createNpmPlugin<
+  TPlugin = any,
+  TExtra extends Record<string, unknown> = Record<string, unknown>
+>(id: string, options: PluginOptions = {}): PluginSystem<TPlugin, TExtra> {
+  return new NpmPluginSystem<TPlugin, TExtra>(id, options)
 }
 
-export { NpmPluginSystem } from './plugin-system'
-export type { PluginInfo, PluginOptions, PluginSystem }
+export { NpmPluginSystem } from './core/plugin-system'
+export type {
+  CachedPlugin,
+  KitMeta,
+  NpmPackageInfo,
+  PackageInfo,
+  PackageInfoBase,
+  PluginInfo,
+  PluginMeta,
+  PluginOptions,
+  PluginSystem,
+  SearchResult
+} from './core/types'

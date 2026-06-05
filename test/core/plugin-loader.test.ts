@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PluginLoader } from '../src/plugin-loader'
+import { PluginLoader } from '../../src/core/plugin-loader'
 
 const tempDirs: string[] = []
 

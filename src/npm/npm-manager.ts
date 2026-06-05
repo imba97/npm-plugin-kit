@@ -1,28 +1,47 @@
-import type { NpmPackageInfo, SearchResult } from './types'
+import type { CacheFields } from '../cache/package-cache'
+import type { CachedPlugin, NpmPackageInfo, SearchResult } from '../core/types'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { join } from 'pathe'
-import { PluginCache } from './cache'
-import { ensureDir, isLocalPath, pathExists, readJsonFile, resolveLocalPath, shellEscape, validateLocalPath } from './utils'
+import { PluginCache } from '../cache/cache'
+import { getNpmListDependencies } from '../cache/cache-migrate'
+import {
+  buildCacheEntry,
+  hasMissingFields,
+  mergeMissingPackageFields,
+  mergeMissingPluginFields
+} from '../cache/package-cache'
+import { ensureDir, isLocalPath, pathExists, readJsonFile, resolveLocalPath, shellEscape, validateLocalPath } from '../utils'
 
 const execAsync = promisify(exec)
 
 interface NpmManagerOptions {
+  pluginId: string
   registry?: string
   npmPath?: string
+  cacheFields?: CacheFields
+}
+
+interface CacheUpdateResult {
+  data: Record<string, CachedPlugin>
+  changed: boolean
 }
 
 export class NpmManager {
   private readonly registry: string
   private readonly npmCommand: string
   private readonly cache: PluginCache
+  private readonly pluginId: string
+  private readonly cacheFields?: CacheFields
 
   constructor(
     private pluginDir: string,
-    options: NpmManagerOptions = {}
+    options: NpmManagerOptions
   ) {
+    this.pluginId = options.pluginId
     this.registry = options.registry || 'https://registry.npmjs.org'
     this.npmCommand = options.npmPath || 'npm'
+    this.cacheFields = options.cacheFields
     this.cache = new PluginCache(pluginDir)
   }
 
@@ -48,17 +67,17 @@ export class NpmManager {
 
     if (isLocalPath(spec)) {
       await this.installFromLocal(spec)
-      const { name, info } = await this.getLocalPackageInfo(spec)
-      await this.cache.updateOne(name, info)
+      const { name, entry } = await this.getLocalCacheEntry(spec)
+      await this.cache.updateOne(name, entry)
       return
     }
 
     await this.installFromRegistry(spec, version)
-    const info = await this.getPackageInfo(spec)
-    if (!info) {
+    const entry = await this.buildCacheEntryForPackage(spec, false)
+    if (!entry) {
       throw new Error(`Failed to get package info for ${spec}, package.json may not exist`)
     }
-    await this.cache.updateOne(spec, info)
+    await this.cache.updateOne(spec, entry)
   }
 
   private async installFromLocal(spec: string): Promise<void> {
@@ -108,62 +127,106 @@ export class NpmManager {
     }
   }
 
-  async list(): Promise<Record<string, NpmPackageInfo>> {
-    const cacheData = await this.cache.read()
+  async list(): Promise<Record<string, CachedPlugin>> {
+    const cacheData = await this.cache.ensureCache()
+
     if (Object.keys(cacheData).length > 0) {
       const validated = await this.validateCache(cacheData)
-      if (Object.keys(validated).length > 0) {
-        if (Object.keys(validated).length !== Object.keys(cacheData).length) {
-          await this.cache.rebuild(validated)
-        }
-        return validated
+      const enriched = await this.enrichCache(validated.data)
+
+      if (Object.keys(enriched.data).length > 0) {
+        if (validated.changed || enriched.changed)
+          await this.cache.rebuild(enriched.data)
+        return enriched.data
       }
     }
 
-    const command = `list --prefix ${shellEscape(this.pluginDir)} --depth=0 --json`
-    let dependencies: Record<string, NpmPackageInfo> = {}
-    try {
-      const { stdout } = await this.executeNpmCommand(command)
-      dependencies = JSON.parse(stdout).dependencies || {}
-    }
-    catch (error: any) {
-      if (error.stdout) {
-        try {
-          dependencies = JSON.parse(error.stdout).dependencies || {}
-        }
-        catch {
-          dependencies = {}
-        }
-      }
-    }
-
-    await Promise.all(
+    const dependencies = await this.fetchInstalledPackageNames()
+    const entries = await Promise.all(
       Object.entries(dependencies).map(async ([pkg, info]) => {
-        const pkgJson = await this.readInstalledPackageJson(pkg)
-        info.description = pkgJson?.description || ''
+        const isLocal = info.resolved ? isLocalPath(info.resolved) : false
+        const entry = await this.buildCacheEntryForPackage(pkg, isLocal)
+        return entry ? [pkg, entry] as const : null
       })
     )
 
-    await this.cache.rebuild(dependencies)
-    return dependencies
+    const rebuilt = Object.fromEntries(
+      entries.filter((entry): entry is [string, CachedPlugin] => entry !== null)
+    )
+    await this.cache.rebuild(rebuilt)
+    return rebuilt
   }
 
-  private async validateCache(cacheData: Record<string, NpmPackageInfo>): Promise<Record<string, NpmPackageInfo>> {
+  private async fetchInstalledPackageNames(): Promise<Record<string, NpmPackageInfo>> {
+    const command = `list --prefix ${shellEscape(this.pluginDir)} --depth=0 --json`
+    try {
+      const { stdout } = await this.executeNpmCommand(command)
+      return getNpmListDependencies(stdout)
+    }
+    catch (error: any) {
+      if (error.stdout)
+        return getNpmListDependencies(error.stdout)
+      return {}
+    }
+  }
+
+  private async validateCache(cacheData: Record<string, CachedPlugin>): Promise<CacheUpdateResult> {
     const entries = await Promise.all(
-      Object.entries(cacheData).map(async ([pkg, info]) => {
+      Object.entries(cacheData).map(async ([pkg, entry]) => {
         const packagePath = join(this.pluginDir, 'node_modules', pkg)
         if (!(await pathExists(packagePath)))
           return null
-        return [pkg, info] as const
+        return [pkg, entry] as const
       })
     )
 
-    return Object.fromEntries(entries.filter(entry => entry !== null))
+    const data = Object.fromEntries(
+      entries.filter((entry): entry is [string, CachedPlugin] => entry !== null)
+    )
+
+    return {
+      data,
+      changed: Object.keys(data).length !== Object.keys(cacheData).length
+    }
   }
 
-  private async getLocalPackageInfo(spec: string): Promise<{ name: string, info: NpmPackageInfo }> {
+  private async enrichCache(cacheData: Record<string, CachedPlugin>): Promise<CacheUpdateResult> {
+    let changed = false
+    const result: Record<string, CachedPlugin> = {}
+
+    for (const [pkg, entry] of Object.entries(cacheData)) {
+      if (!hasMissingFields(entry, this.pluginId, this.cacheFields)) {
+        result[pkg] = entry
+        continue
+      }
+
+      const pkgJson = await this.readInstalledPackageJson(pkg)
+      if (!pkgJson) {
+        result[pkg] = entry
+        continue
+      }
+
+      result[pkg] = {
+        package: mergeMissingPackageFields(
+          entry.package as Record<string, unknown>,
+          pkgJson,
+          this.pluginId,
+          this.cacheFields
+        ) as CachedPlugin['package'],
+        plugin: mergeMissingPluginFields(entry.plugin, this.pluginDir, pkg)
+      }
+      changed = true
+    }
+
+    return {
+      data: changed ? result : cacheData,
+      changed
+    }
+  }
+
+  private async getLocalCacheEntry(spec: string): Promise<{ name: string, entry: CachedPlugin }> {
     const localPath = resolveLocalPath(spec)
-    const pkg = await readJsonFile(join(localPath, 'package.json'))
+    const pkg = await readJsonFile<Record<string, unknown>>(join(localPath, 'package.json'))
     const name = pkg.name
 
     if (typeof name !== 'string' || name.length === 0) {
@@ -172,16 +235,18 @@ export class NpmManager {
 
     return {
       name,
-      info: {
-        version: pkg.version || '',
-        resolved: '',
-        overridden: false,
-        description: pkg.description || ''
-      }
+      entry: buildCacheEntry(pkg, this.pluginDir, name, true, this.pluginId, this.cacheFields)
     }
   }
 
-  private async readInstalledPackageJson(packageName: string): Promise<Record<string, any> | null> {
+  private async buildCacheEntryForPackage(packageName: string, isLocal: boolean): Promise<CachedPlugin | null> {
+    const pkg = await this.readInstalledPackageJson(packageName)
+    if (!pkg)
+      return null
+    return buildCacheEntry(pkg, this.pluginDir, packageName, isLocal, this.pluginId, this.cacheFields)
+  }
+
+  private async readInstalledPackageJson(packageName: string): Promise<Record<string, unknown> | null> {
     const packageJsonPath = join(this.pluginDir, 'node_modules', packageName, 'package.json')
     if (!(await pathExists(packageJsonPath)))
       return null
@@ -190,18 +255,6 @@ export class NpmManager {
     }
     catch {
       return null
-    }
-  }
-
-  private async getPackageInfo(packageName: string): Promise<NpmPackageInfo | null> {
-    const pkg = await this.readInstalledPackageJson(packageName)
-    if (!pkg)
-      return null
-    return {
-      version: pkg.version,
-      resolved: '',
-      overridden: false,
-      description: pkg.description || ''
     }
   }
 
@@ -246,6 +299,6 @@ export class NpmManager {
 
   async getInstalledVersion(packageName: string): Promise<string | null> {
     const pkg = await this.readInstalledPackageJson(packageName)
-    return pkg?.version ?? null
+    return typeof pkg?.version === 'string' ? pkg.version : null
   }
 }

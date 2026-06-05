@@ -1,4 +1,4 @@
-import type { PluginOptions } from './types'
+import type { PluginOptions } from '../core/types'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { cwd } from 'node:process'
@@ -19,6 +19,26 @@ export async function writeJsonFile(path: string, data: unknown): Promise<void> 
 
 export async function ensureDir(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true })
+}
+
+export function createAsyncLock() {
+  let lock: Promise<void> = Promise.resolve()
+
+  return async function withLock<T>(fn: () => Promise<T>): Promise<T> {
+    let release!: () => void
+    const next = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const prev = lock
+    lock = prev.then(() => next)
+    await prev
+    try {
+      return await fn()
+    }
+    finally {
+      release()
+    }
+  }
 }
 
 export function validatePluginId(pluginId: string): boolean {

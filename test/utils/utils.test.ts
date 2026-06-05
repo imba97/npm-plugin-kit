@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isLocalPath, resolveLocalPath, resolvePackageEntry, shellEscape, validatePluginId } from '../src/utils'
+import { isLocalPath, resolveLocalPath, resolvePackageEntry, shellEscape, validatePluginId } from '../../src/utils'
 
 describe('utils', () => {
   describe('isLocalPath', () => {

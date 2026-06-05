@@ -1,5 +1,5 @@
 import { join } from 'pathe'
-import { pathExists, readJsonFile, resolvePackageEntry } from './utils'
+import { pathExists, readJsonFile, resolvePackageEntry } from '../utils'
 
 export class PluginLoader<T = any> {
   private cache = new Map<string, T>()

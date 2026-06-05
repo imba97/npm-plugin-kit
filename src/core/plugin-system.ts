@@ -1,10 +1,13 @@
 import type { PluginInfo, PluginOptions, PluginSystem, SearchResult } from './types'
 import { join } from 'pathe'
-import { NpmManager } from './npm-manager'
+import { NpmManager } from '../npm/npm-manager'
+import { getPluginDir, validatePluginId } from '../utils'
 import { PluginLoader } from './plugin-loader'
-import { getPluginDir, isLocalPath, validatePluginId } from './utils'
 
-export class NpmPluginSystem<T = any> implements PluginSystem<T> {
+export class NpmPluginSystem<
+  TPlugin = any,
+  TExtra extends Record<string, unknown> = Record<string, unknown>
+> implements PluginSystem<TPlugin, TExtra> {
   private readonly npmManager: NpmManager
   private readonly pluginLoader: PluginLoader
   private readonly pluginDir: string
@@ -17,8 +20,10 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
     const pluginDir = getPluginDir(id, options)
     this.pluginDir = pluginDir
     this.npmManager = new NpmManager(pluginDir, {
+      pluginId: id,
       registry: options.registry,
-      npmPath: options.npmPath
+      npmPath: options.npmPath,
+      cacheFields: options.cacheFields
     })
     this.pluginLoader = new PluginLoader(pluginDir)
   }
@@ -41,13 +46,12 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
     await this.npmManager.uninstall(packageName)
   }
 
-  async list(): Promise<PluginInfo[]> {
+  async list(): Promise<PluginInfo<TExtra>[]> {
     const installed = await this.npmManager.list()
-    return Object.entries(installed).map(([name, info]) => ({
+    return Object.entries(installed).map(([name, entry]) => ({
       name,
-      version: info.version,
-      description: info.description,
-      isLocal: isLocalPath(info.resolved)
+      package: entry.package as PluginInfo<TExtra>['package'],
+      plugin: entry.plugin
     }))
   }
 
@@ -56,7 +60,7 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
     await this.npmManager.install(packageName, version)
   }
 
-  async load(packageName: string): Promise<T> {
+  async load(packageName: string): Promise<TPlugin> {
     return await this.pluginLoader.load(packageName)
   }
 

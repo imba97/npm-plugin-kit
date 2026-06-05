@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createNpmPlugin, NpmPluginSystem } from '../src/index'
+import { createNpmPlugin, NpmPluginSystem } from '../../src/index'
 
 describe('plugin-system', () => {
   describe('createNpmPlugin', () => {
@@ -24,7 +24,8 @@ describe('plugin-system', () => {
     it('should accept custom options', () => {
       const plugins = createNpmPlugin('test-app', {
         pluginDir: '/custom/path',
-        registry: 'https://custom-registry.com'
+        registry: 'https://custom-registry.com',
+        cacheFields: ['homepage']
       })
 
       expect(plugins).toBeDefined()
@@ -79,6 +80,42 @@ describe('plugin-system', () => {
       expect(filePath).toContain('node_modules/my-plugin')
       expect(filePath).toContain('assets')
       expect(filePath).toContain('logo.png')
+    })
+
+    it('should return list items with name, package and plugin sections', async () => {
+      const system = new NpmPluginSystem('test-list')
+      const npmManager = (system as any).npmManager
+
+      vi.spyOn(npmManager, 'list').mockResolvedValue({
+        'my-plugin': {
+          package: {
+            version: '1.0.0',
+            description: 'desc',
+            author: 'Alice',
+            homepage: 'https://example.com'
+          },
+          plugin: {
+            root: '/tmp/.test-list/node_modules/my-plugin',
+            isLocal: false
+          }
+        }
+      })
+
+      const list = await system.list()
+
+      expect(list).toEqual([{
+        name: 'my-plugin',
+        package: {
+          version: '1.0.0',
+          description: 'desc',
+          author: 'Alice',
+          homepage: 'https://example.com'
+        },
+        plugin: {
+          root: '/tmp/.test-list/node_modules/my-plugin',
+          isLocal: false
+        }
+      }])
     })
   })
 })
