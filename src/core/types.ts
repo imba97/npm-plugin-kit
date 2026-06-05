@@ -40,7 +40,7 @@ export interface PackageInfoBase {
 }
 
 /** packageInfo section = built-in + user-defined fields from cacheFields */
-export type PackageInfo<T extends Record<string, unknown> = Record<string, unknown>>
+export type PackageInfo<T extends object = Record<string, unknown>>
   = PackageInfoBase & T
 
 /** plugin section = install metadata (not from package.json) */
@@ -52,13 +52,13 @@ export interface PluginMeta {
 }
 
 /** Cache value (key is package name) */
-export interface CachedPlugin<T extends Record<string, unknown> = Record<string, unknown>> {
+export interface CachedPlugin<T extends object = Record<string, unknown>> {
   packageInfo: PackageInfo<T>
   plugin: PluginMeta
 }
 
 /** list() return value */
-export interface PluginInfo<T extends Record<string, unknown> = Record<string, unknown>> {
+export interface PluginInfo<T extends object = Record<string, unknown>> {
   name: string
   packageInfo: PackageInfo<T>
   plugin: PluginMeta
@@ -78,7 +78,7 @@ export interface KitMeta {
 
 export interface PluginSystem<
   TPlugin = any,
-  TExtra extends Record<string, unknown> = Record<string, unknown>
+  TExtra extends object = Record<string, unknown>
 > {
   search: (keyword: string) => Promise<SearchResult[]>
   view: (packageName: string) => Promise<SearchResult | null>

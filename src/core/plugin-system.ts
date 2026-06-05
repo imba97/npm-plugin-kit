@@ -6,7 +6,7 @@ import { PluginLoader } from './plugin-loader'
 
 export class NpmPluginSystem<
   TPlugin = any,
-  TExtra extends Record<string, unknown> = Record<string, unknown>
+  TExtra extends object = Record<string, unknown>
 > implements PluginSystem<TPlugin, TExtra> {
   private readonly npmManager: NpmManager
   private readonly pluginLoader: PluginLoader
