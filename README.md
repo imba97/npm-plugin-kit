@@ -59,4 +59,5 @@ Creates a plugin system instance.
 | `load<T>(name)` | Load and return plugin module |
 | `list()` | List all installed plugins |
 | `search(keyword)` | Search npm registry for plugins |
+| `view(name)` | Look up an exact package name on the registry |
 | `update(name, version?)` | Update plugin to new version |

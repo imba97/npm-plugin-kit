@@ -217,6 +217,28 @@ export class NpmManager {
     }
   }
 
+  async view(packageName: string): Promise<SearchResult | null> {
+    const command = `view ${shellEscape(packageName)} --json --registry ${shellEscape(this.registry)}`
+
+    try {
+      const { stdout } = await this.executeNpmCommand(command)
+      const pkg = JSON.parse(stdout)
+      const info = Array.isArray(pkg) ? pkg[0] : pkg
+
+      if (!info?.name)
+        return null
+
+      return {
+        name: info.name,
+        version: info.version || '',
+        description: info.description || ''
+      }
+    }
+    catch {
+      return null
+    }
+  }
+
   async isInstalled(packageName: string): Promise<boolean> {
     const packagePath = join(this.pluginDir, 'node_modules', packageName)
     return await pathExists(packagePath)

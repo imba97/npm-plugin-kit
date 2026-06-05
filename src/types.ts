@@ -20,6 +20,7 @@ export interface PluginOptions {
 
 export interface PluginSystem<T = any> {
   search: (keyword: string) => Promise<SearchResult[]>
+  view: (packageName: string) => Promise<SearchResult | null>
   install: (packageName: string, version?: string) => Promise<void>
   uninstall: (packageName: string) => Promise<void>
   list: () => Promise<PluginInfo[]>

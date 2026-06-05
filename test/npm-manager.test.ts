@@ -102,6 +102,44 @@ describe('npm-manager', () => {
     expect(JSON.parse(cacheRaw)).toEqual(list)
   })
 
+  it('should resolve exact package name via npm view', async () => {
+    const pluginDir = await createTempDir('npm-plugin-kit-plugin-dir-')
+    const manager = new NpmManager(pluginDir)
+
+    const executeNpmCommand = vi.spyOn(manager as never, 'executeNpmCommand' as never)
+      .mockResolvedValue({
+        stdout: JSON.stringify({
+          name: 'initx-plugin-svg-writer',
+          version: '0.0.1',
+          description: 'Interactive SVG writer plugin for initx'
+        }),
+        stderr: ''
+      } as never)
+
+    const result = await manager.view('initx-plugin-svg-writer')
+
+    expect(executeNpmCommand).toHaveBeenCalledWith(
+      `view 'initx-plugin-svg-writer' --json --registry 'https://registry.npmjs.org'`
+    )
+    expect(result).toEqual({
+      name: 'initx-plugin-svg-writer',
+      version: '0.0.1',
+      description: 'Interactive SVG writer plugin for initx'
+    })
+  })
+
+  it('should return null when npm view fails', async () => {
+    const pluginDir = await createTempDir('npm-plugin-kit-plugin-dir-')
+    const manager = new NpmManager(pluginDir)
+
+    vi.spyOn(manager as never, 'executeNpmCommand' as never)
+      .mockRejectedValue(new Error('E404') as never)
+
+    const result = await manager.view('missing-package')
+
+    expect(result).toBeNull()
+  })
+
   it('should escape special characters in npm commands', async () => {
     const pluginDir = await createTempDir('npm-plugin-kit-plugin-dir-')
     const manager = new NpmManager(pluginDir, {

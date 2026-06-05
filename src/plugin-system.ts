@@ -27,6 +27,10 @@ export class NpmPluginSystem<T = any> implements PluginSystem<T> {
     return await this.npmManager.search(keyword)
   }
 
+  async view(packageName: string): Promise<SearchResult | null> {
+    return await this.npmManager.view(packageName)
+  }
+
   async install(packageName: string, version?: string): Promise<void> {
     this.pluginLoader.unload(packageName)
     await this.npmManager.install(packageName, version)
