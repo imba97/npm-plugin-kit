@@ -59,6 +59,9 @@ export function getPluginDir(pluginId: string, options?: PluginOptions): string 
 }
 
 export function isLocalPath(packageName: string): boolean {
+  if (typeof packageName !== 'string' || packageName.length === 0)
+    return false
+
   if (packageName.startsWith('file:')) {
     return true
   }

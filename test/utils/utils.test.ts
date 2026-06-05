@@ -27,6 +27,11 @@ describe('utils', () => {
       expect(isLocalPath('@types/node')).toBe(false)
       expect(isLocalPath('my-awesome-plugin')).toBe(false)
     })
+
+    it('should return false for empty or non-string values', () => {
+      expect(isLocalPath('')).toBe(false)
+      expect(isLocalPath(undefined as unknown as string)).toBe(false)
+    })
   })
 
   describe('resolveLocalPath', () => {
