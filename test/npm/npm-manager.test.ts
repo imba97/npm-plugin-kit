@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NpmManager } from '../../src/npm/npm-manager'
+import { pathExists } from '../../src/utils'
 
 interface NpmCommandResult {
   stdout: string
@@ -329,5 +330,23 @@ describe('npm-manager', () => {
     expect(executeNpmCommand).toHaveBeenCalledWith(
       `install ${quote('@initx-plugin/manager')} --prefix ${quote(pluginDir)} --registry ${quote(registry)}`
     )
+  })
+
+  it('should create the plugin dir before running npm with --prefix', async () => {
+    const baseDir = await createTempDir('npm-plugin-kit-plugin-dir-')
+    const pluginDir = join(baseDir, 'nested', 'plugins')
+
+    const manager = new NpmManager(pluginDir, { pluginId: 'test-app' })
+
+    spyExecuteNpmCommand(manager).mockResolvedValue({
+      stdout: JSON.stringify({ dependencies: {} }),
+      stderr: ''
+    })
+
+    expect(await pathExists(pluginDir)).toBe(false)
+
+    await manager.list()
+
+    expect(await pathExists(pluginDir)).toBe(true)
   })
 })

@@ -158,6 +158,10 @@ export class NpmManager {
   }
 
   private async fetchInstalledPackageNames(): Promise<Record<string, NpmPackageInfo>> {
+    // npm resolves a missing `--prefix` dir relative to the cwd, so make sure
+    // the plugin dir exists before listing
+    await ensureDir(this.pluginDir)
+
     const command = `list --prefix ${shellEscape(this.pluginDir)} --depth=0 --json`
     try {
       const { stdout } = await this.executeNpmCommand(command)
