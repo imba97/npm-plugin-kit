@@ -12,6 +12,14 @@ interface NpmCommandResult {
 
 type ExecuteNpmCommand = (command: string) => Promise<NpmCommandResult>
 
+/**
+ * Independent expectation of how the manager quotes npm arguments on the
+ * current platform (single quotes on posix, double quotes on windows).
+ */
+function quote(value: string): string {
+  return process.platform === 'win32' ? `"${value}"` : `'${value}'`
+}
+
 function spyExecuteNpmCommand(manager: NpmManager): MockInstance<ExecuteNpmCommand> {
   return vi.spyOn(
     manager as unknown as { executeNpmCommand: ExecuteNpmCommand },
@@ -260,7 +268,7 @@ describe('npm-manager', () => {
     const result = await manager.view('initx-plugin-svg-writer')
 
     expect(executeNpmCommand).toHaveBeenCalledWith(
-      `view 'initx-plugin-svg-writer' --json --registry 'https://registry.npmjs.org'`
+      `view ${quote('initx-plugin-svg-writer')} --json --registry ${quote('https://registry.npmjs.org')}`
     )
     expect(result).toEqual({
       name: 'initx-plugin-svg-writer',
@@ -294,7 +302,32 @@ describe('npm-manager', () => {
     await manager.search(`plugin's name`)
 
     expect(executeNpmCommand).toHaveBeenCalledWith(
-      `search 'plugin'\\''s name' --json --registry 'https://registry.example.com?q=1'`
+      `search ${quote(`plugin's name`)} --json --registry ${quote('https://registry.example.com?q=1')}`
+    )
+  })
+
+  it('should use platform-safe quoting for plugin dir and registry', async () => {
+    const pluginDir = await createTempDir('npm-plugin-kit-plugin-dir-')
+    const registry = 'https://registry.npmjs.org'
+    const manager = new NpmManager(pluginDir, { pluginId: 'test-app', registry })
+
+    const executeNpmCommand = spyExecuteNpmCommand(manager)
+      .mockImplementation(async () => {
+        const installedPackageDir = join(pluginDir, 'node_modules', '@initx-plugin/manager')
+        await mkdir(installedPackageDir, { recursive: true })
+        await writeFile(join(installedPackageDir, 'package.json'), JSON.stringify({
+          name: '@initx-plugin/manager',
+          version: '0.1.0',
+          description: 'manager plugin'
+        }))
+
+        return { stdout: '', stderr: '' }
+      })
+
+    await manager.install('@initx-plugin/manager')
+
+    expect(executeNpmCommand).toHaveBeenCalledWith(
+      `install ${quote('@initx-plugin/manager')} --prefix ${quote(pluginDir)} --registry ${quote(registry)}`
     )
   })
 })

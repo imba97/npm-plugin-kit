@@ -55,9 +55,26 @@ describe('utils', () => {
   })
 
   describe('shellEscape', () => {
-    it('should wrap arguments in single quotes', () => {
-      expect(shellEscape('my-plugin')).toBe(`'my-plugin'`)
-      expect(shellEscape(`it's fine`)).toBe(`'it'\\''s fine'`)
+    it('should wrap arguments in single quotes on posix', () => {
+      expect(shellEscape('my-plugin', 'linux')).toBe(`'my-plugin'`)
+      expect(shellEscape(`it's fine`, 'darwin')).toBe(`'it'\\''s fine'`)
+    })
+
+    it('should wrap arguments in double quotes on windows', () => {
+      // cmd.exe does not treat single quotes as quotes
+      expect(shellEscape('my-plugin', 'win32')).toBe(`"my-plugin"`)
+      expect(shellEscape('C:\\Users\\me\\.initx\\plugins', 'win32'))
+        .toBe(`"C:\\Users\\me\\.initx\\plugins"`)
+      expect(shellEscape('C:/Users/me/.initx/plugins', 'win32'))
+        .toBe(`"C:/Users/me/.initx/plugins"`)
+      expect(shellEscape('https://registry.npmjs.org', 'win32'))
+        .toBe(`"https://registry.npmjs.org"`)
+      expect(shellEscape('with space', 'win32')).toBe(`"with space"`)
+    })
+
+    it('should escape quotes and trailing backslashes on windows', () => {
+      expect(shellEscape('say "hi"', 'win32')).toBe(`"say \\"hi\\""`)
+      expect(shellEscape('C:\\path with space\\', 'win32')).toBe(`"C:\\path with space\\\\"`)
     })
   })
 

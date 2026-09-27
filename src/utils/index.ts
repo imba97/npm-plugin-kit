@@ -1,7 +1,7 @@
 import type { PluginOptions } from '../core/types'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { cwd } from 'node:process'
+import { cwd, platform } from 'node:process'
 import { dirname, isAbsolute, join, resolve } from 'pathe'
 
 export async function pathExists(path: string): Promise<boolean> {
@@ -45,7 +45,24 @@ export function validatePluginId(pluginId: string): boolean {
   return /^[a-z][a-z0-9-]*$/.test(pluginId) && pluginId.length >= 3
 }
 
-export function shellEscape(arg: string): string {
+/**
+ * Quote an argument so it survives being parsed by the platform shell.
+ *
+ * - POSIX shells (`sh`, `bash`, ...) use single quotes
+ * - Windows commands run through `cmd.exe`, which does NOT treat single
+ *   quotes as quotes, so double quotes must be used there
+ */
+export function shellEscape(arg: string, targetPlatform: NodeJS.Platform = platform): string {
+  if (targetPlatform === 'win32') {
+    // Double backslashes that precede a quote or sit at the end of the
+    // argument, otherwise they would escape the closing quote.
+    const escaped = arg
+      .replace(/(\\*)"/g, '$1$1\\"')
+      .replace(/(\\+)$/, '$1$1')
+
+    return `"${escaped}"`
+  }
+
   return `'${arg.replace(/'/g, `'\\''`)}'`
 }
 
